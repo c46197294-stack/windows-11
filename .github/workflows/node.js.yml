@@ -1,32 +1,34 @@
 name: Build Windows 11 King Maple APK
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build-apk:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Baixar o projeto
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js
+      - name: Configure Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 20
 
-      - name: Configurar Java
+      - name: Configure Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: '17'
 
       - name: Instalar dependências
-        run: npm ci
+        run: npm install
 
       - name: Compilar versão web
         run: npm run build
@@ -35,25 +37,46 @@ jobs:
         run: npm install @capacitor/core @capacitor/cli @capacitor/android
 
       - name: Preparar configuração Android
-        run: |
-          if [ ! -f capacitor.config.json ] && [ ! -f capacitor.config.ts ]; then
-            npx cap init "Windows 11 King Maple" com.kingmaple.windows11 --web-dir=dist
-          fi
+        run: cp capacitor.config.example.json capacitor.config.json
 
-      - name: Adicionar plataforma Android
+      - name: Adicionar plataformas Android
         run: npx cap add android
 
       - name: Sincronizar Android
         run: npx cap sync android
 
-      - name: Gerar APK
+      # Espelho do Maven Central para tentar contornar erros HTTP 403.
+      - name: Corrigir acesso ao Maven Central (espelho)
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          cat > mirror.gradle <<'EOF'
+          allprojects {
+              buildscript {
+                  repositories {
+                      maven {
+                          url 'https://maven-central.storage-download.googleapis.com/maven2/'
+                      }
+                  }
+              }
+              repositories {
+                  maven {
+                      url 'https://maven-central.storage-download.googleapis.com/maven2/'
+                  }
+              }
+          }
+          settingsEvaluated { s ->
+              s.pluginManagement.repositories {
+                  maven {
+                      url 'https://maven-central.storage-download.googleapis.com/maven2/'
+                  }
+              }
+          }
+          EOF
 
-      - name: Guardar APK
+      - name: Gerar APK
+        run: cd android && ./gradlew assembleDebug --init-script ../mirror.gradle --stacktrace
+
+      - name: Upload do APK
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-11-King-Maple-APK
+          name: app-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
