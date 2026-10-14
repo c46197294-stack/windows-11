@@ -1,0 +1,32 @@
+name: Build Windows 11 King Maple
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Compilar projeto web
+        run: npm run build
+
+      - name: Guardar arquivos compilados
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-11-king-maple-web
+          path: dist/
