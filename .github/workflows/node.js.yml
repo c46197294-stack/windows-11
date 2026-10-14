@@ -1,4 +1,4 @@
-Escrita
+
 name: Build Windows 11 King Maple APK
 on: workflow_dispatch: push: branches: - main
 jobs: build-apk: runs-on: ubuntu-latest
