@@ -1,4 +1,5 @@
-name: Build Windows 11 King Maple
+
+name: Build Windows 11 King Maple APK
 
 on:
   workflow_dispatch:
@@ -7,11 +8,10 @@ on:
       - main
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Baixar projeto
+      - name: Baixar o projeto
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
@@ -22,11 +22,38 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
-      - name: Compilar projeto web
+      - name: Compilar versão web
         run: npm run build
 
-      - name: Guardar arquivos compilados
+      - name: Instalar Capacitor
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Preparar configuração Android
+        run: |
+          if [ ! -f capacitor.config.json ] && [ ! -f capacitor.config.ts ]; then
+            npx cap init "Windows 11 King Maple" com.kingmaple.windows11 --web-dir=dist
+          fi
+
+      - name: Adicionar Android
+        run: npx cap add android
+
+      - name: Sincronizar Android
+        run: npx cap sync android
+
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Gerar APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Guardar APK
         uses: actions/upload-artifact@v4
         with:
-          name: windows-11-king-maple-web
-          path: dist/
+          name: Windows-11-King-Maple-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
