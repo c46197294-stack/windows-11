@@ -1,58 +1,60 @@
 
 name: Build Windows 11 King Maple APK
-on: workflow_dispatch: push: branches: - main
-jobs: build-apk: runs-on: ubuntu-latest
-steps:
-  - name: Baixar o projeto
-    uses: actions/checkout@v4
 
-  - name: Configurar Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version: "20"
-      cache: npm
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-  - name: Instalar dependências
-    run: npm ci
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o projeto
+        uses: actions/checkout@v4
 
-  - name: Compilar versão web
-    run: npm run build
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-  - name: Instalar Capacitor
-    run: npm install @capacitor/core @capacitor/cli @capacitor/android
+      - name: Instalar dependências
+        run: npm ci
 
-  - name: Preparar configuração Android
-    run: |
-      if [ ! -f capacitor.config.json ] && [ ! -f capacitor.config.ts ]; then
-        npx cap init "Windows 11 King Maple" com.kingmaple.windows11 --web-dir=dist
-      fi
+      - name: Compilar versão web
+        run: npm run build
 
-  - name: Adicionar Android
-    run: npx cap add android
+      - name: Instalar Capacitor
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android
 
-  - name: Sincronizar Android
-    run: npx cap sync android
+      - name: Preparar configuração Android
+        run: |
+          if [ ! -f capacitor.config.json ] && [ ! -f capacitor.config.ts ]; then
+            npx cap init "Windows 11 King Maple" com.kingmaple.windows11 --web-dir=dist
+          fi
 
-  - name: Preparar Java
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: "21"
+      - name: Adicionar Android
+        run: npx cap add android
 
-  - name: Diagnosticar dependências Kotlin
-    continue-on-error: true
-    run: |
-      cd android
-      ./gradlew buildEnvironment
+      - name: Sincronizar Android
+        run: npx cap sync android
 
-  - name: Gerar APK
-    run: |
-      cd android
-      chmod +x gradlew
-      ./gradlew assembleDebug
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
 
-  - name: Guardar APK
-    uses: actions/upload-artifact@v4
-    with:
-      name: Windows-11-King-Maple-APK
-      path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Gerar APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Guardar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-11-King-Maple-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+ 
