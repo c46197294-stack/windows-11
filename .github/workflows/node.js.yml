@@ -1,7 +1,21 @@
-lname: Build Windows 11 King Maple APK
+name: Build Windows 11 King Maple APK
+on: 
+workflow_dispatch:
+push:
+branches: ["main"]
 
-on: workflow_dispatch: push: branches: [ "main" ]
-
-jobs: build-apk: runs-on: ubuntu-latest
-
-steps: - name: Baixar o código do projeto uses: actions/checkout@v4 - name: Configurar Node.js uses: actions/setup-node@v4 with: node-version: 20 cache: npm - name: Instalar dependências run: npm ci - name: Compilar o site run: npm run build - name: Instalar Java uses: actions/setup-java@v4 with: distribution: temurin java-version: '21' - name: Preparar Capacitor run: | npm install @capacitor/core @capacitor/cli @capacitor/android if [ ! -f capacitor.config.json ] && [ ! -f capacitor.config.ts ]; then npx cap init "Windows 11 King Maple" com.kingmaple.windows11 --web-dir=dist fi if [ ! -d android ]; then npx cap add android fi npx cap sync android - name: Configurar Gradle uses: gradle/actions/setup-gradle@v4 - name: Gerar APK run: | cd android chmod +x gradlew ./gradlew assembleDebug - name: Disponibilizar APK uses: actions/upload-artifact@v4 with: name: Windows-11-King-Maple-APK path: android/app/build/outputs/apk/debug/app-debug.apk 
+jobs: 
+build-apk:
+runs-on: ubuntu-latest 
+steps: 
+- name: Baixar o código do projeto uses: actions/checkout@v4 
+- name: Configurar Node.js 
+uses: actions/setup-node@v4 
+with: node-version: "20" 
+cache: npm 
+name: Instalar dependências run: npm ci 
+name: Compilar o projeto web run: npm run build 
+ name: Enviar arquivos compilados 
+uses: actions/upload-artifact@v4 
+with:
+name: windows-11-king-maple-web path: dist/
