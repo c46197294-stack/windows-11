@@ -72,6 +72,19 @@ jobs:
           }
           EOF
 
+      # kotlin-stdlib 1.8.22 (do AGP) conflita com kotlin-stdlib-jdk7/jdk8 1.6.21 (do Capacitor).
+      # Constraints alinham os artefatos jdk7/jdk8 a 1.8.22 (correcao documentada pelo Google).
+      - name: Corrigir classes duplicadas do Kotlin
+        run: |
+          cat >> android/app/build.gradle <<'EOF'
+          dependencies {
+              constraints {
+                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22")
+                  implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22")
+              }
+          }
+          EOF
+
       - name: Gerar APK
         run: cd android && ./gradlew assembleDebug --init-script ../mirror.gradle --stacktrace
 
