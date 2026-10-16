@@ -1,8 +1,6 @@
-name: Build Windows 11 King Maple APK
+name: Build Desktop Samsung APK (release assinado)
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -27,16 +25,16 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Instalar dependências
+      - name: Instalar dependencias
         run: npm install
 
-      - name: Compilar versão web
+      - name: Compilar versao web
         run: npm run build
 
       - name: Instalar Capacitor
         run: npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Preparar configuração Android
+      - name: Preparar configuracao Android
         run: cp capacitor.config.example.json capacitor.config.json
 
       - name: Adicionar plataformas Android
@@ -73,7 +71,6 @@ jobs:
           EOF
 
       # kotlin-stdlib 1.8.22 (do AGP) conflita com kotlin-stdlib-jdk7/jdk8 1.6.21 (do Capacitor).
-      # Constraints alinham os artefatos jdk7/jdk8 a 1.8.22 (correcao documentada pelo Google).
       - name: Corrigir classes duplicadas do Kotlin
         run: |
           cat >> android/app/build.gradle <<'EOF'
@@ -85,11 +82,41 @@ jobs:
           }
           EOF
 
+      # Mesma chave em TODOS os builds futuros: atualiza o app instalado normalmente.
+      - name: Restaurar chave de assinatura
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > /tmp/desktop-samsung.jks
+          test -s /tmp/desktop-samsung.jks
+
+      - name: Definir versao (versionCode 2 / versionName 1.1)
+        run: |
+          sed -i 's/versionCode 1/versionCode 2/' android/app/build.gradle
+          sed -i 's/versionName "1.0"/versionName "1.1"/' android/app/build.gradle
+          grep -nE 'versionCode|versionName' android/app/build.gradle
+
       - name: Gerar APK
         run: cd android && ./gradlew assembleDebug --init-script ../mirror.gradle --stacktrace
+
+      - name: Assinar APK com a chave definitiva
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort | tail -1)
+          $APKSIGNER sign \
+            --ks /tmp/desktop-samsung.jks \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass pass:"$KEYSTORE_PASSWORD" \
+            --key-pass pass:"$KEY_PASSWORD" \
+            --out desktop-samsung-v1.1.apk \
+            android/app/build/outputs/apk/debug/app-debug.apk
+          $APKSIGNER verify --print-certs desktop-samsung-v1.1.apk
 
       - name: Upload do APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: desktop-samsung-apk-v1.1
+          path: desktop-samsung-v1.1.apk

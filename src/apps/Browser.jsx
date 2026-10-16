@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, RotateCw, Home, ExternalLink, Search, Globe } from 'lucide-react';
 
 function normalizeUrl(input) {
@@ -16,7 +16,7 @@ const QUICK_LINKS = [
   { name: 'Base44', url: 'https://base44.com' },
 ];
 
-export default function Browser() {
+export default function Browser({ startUrl }) {
   const [url, setUrl] = useState('');
   const [current, setCurrent] = useState(null);
   const [history, setHistory] = useState([]);
@@ -67,6 +67,12 @@ export default function Browser() {
     setUrl('');
     setFailed(false);
   }
+
+  // Abertura via Loja de Aplicativos (startUrl): navega para o endereço ao mudar.
+  useEffect(() => {
+    if (startUrl) go(startUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startUrl]);
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-zinc-900 text-black dark:text-white">

@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   Info,
   FileArchive as ArchiveIcon,
+  Store,
 } from 'lucide-react';
 
 import Calculator from './Calculator';
@@ -22,6 +23,7 @@ import RecycleBin from './RecycleBin';
 import AppManager from './AppManager';
 import AboutPC from './AboutPC';
 import ExportSource from './ExportSource';
+import AppStore from './AppStore';
 
 // Registro central de aplicativos. Cada app tem nome, ícone, cor e componente.
 export const APPS = [
@@ -33,6 +35,7 @@ export const APPS = [
   { id: 'notepad', name: 'Bloco de Notas', icon: StickyNote, color: '#f59e0b', component: Notepad, defaultSize: { w: 560, h: 440 } },
   { id: 'calendar', name: 'Calendário', icon: CalendarDays, color: '#ef4444', component: CalendarApp, defaultSize: { w: 640, h: 500 } },
   { id: 'appmanager', name: 'Aplicativos', icon: LayoutGrid, color: '#8b5cf6', component: AppManager, defaultSize: { w: 600, h: 460 } },
+  { id: 'store', name: 'Loja de Aplicativos', icon: Store, color: '#2563eb', component: AppStore, defaultSize: { w: 680, h: 500 } },
   { id: 'settings', name: 'Configurações', icon: SettingsIcon, color: '#64748b', component: Settings, defaultSize: { w: 640, h: 500 } },
   { id: 'about', name: 'Sobre o Sistema', icon: Info, color: '#0ea5e9', component: AboutPC, defaultSize: { w: 520, h: 420 } },
   { id: 'export', name: 'Exportar Código', icon: ArchiveIcon, color: '#16a34a', component: ExportSource, defaultSize: { w: 480, h: 460 } },

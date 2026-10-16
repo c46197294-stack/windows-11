@@ -20,14 +20,15 @@ export default function Desktop() {
 
   useEffect(() => saveState(STORAGE_KEYS.settings, settings), [settings]);
 
-  const openApp = useCallback((appId) => {
+  const openApp = useCallback((appId, options = {}) => {
     const app = APP_MAP[appId];
     if (!app) return;
+    const startUrl = options.startUrl;
     setWindows((ws) => {
       const existing = ws.find((w) => w.appId === appId);
       if (existing) {
         const z = ++zRef.current;
-        return ws.map((w) => (w.id === existing.id ? { ...w, minimized: false, z } : w));
+        return ws.map((w) => (w.id === existing.id ? { ...w, minimized: false, z, startUrl } : w));
       }
       const id = appId + '_' + Date.now();
       const z = ++zRef.current;
@@ -38,7 +39,7 @@ export default function Desktop() {
       const offset = (ws.length % 6) * 28;
       const x = Math.max(8, Math.min(window.innerWidth - width - 8, Math.floor((window.innerWidth - width) / 2) + offset - 60));
       const y = Math.max(8, Math.min(window.innerHeight - height - 56, Math.floor((window.innerHeight - 48 - height) / 2) + offset - 60));
-      return [...ws, { id, appId, title: app.name, x, y, width, height, minimized: false, maximized: false, z }];
+      return [...ws, { id, appId, title: app.name, x, y, width, height, minimized: false, maximized: false, z, startUrl }];
     });
     setStartOpen(false);
     setSearch('');
@@ -158,6 +159,7 @@ export default function Desktop() {
               setSettings={setSettings}
               openApp={openApp}
               startId={w.appId === 'thispc' ? 'root' : undefined}
+              startUrl={w.startUrl}
             />
           </Window>
         );

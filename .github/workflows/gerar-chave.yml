@@ -1,0 +1,41 @@
+name: Gerar chave de assinatura (usar uma vez)
+
+on:
+  workflow_dispatch:
+    inputs:
+      store_pass:
+        description: 'Senha da keystore (usada apenas nesta geracao)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  gerar-chave:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Gerar keystore definitiva
+        env:
+          STORE_PASS: ${{ inputs.store_pass }}
+        run: |
+          keytool -genkeypair -v \
+            -keystore desktop-samsung.jks \
+            -alias desktop-samsung \
+            -keyalg RSA -keysize 2048 -validity 10950 \
+            -storepass "$STORE_PASS" -keypass "$STORE_PASS" \
+            -dname "CN=Desktop Samsung, OU=Mobile, O=Desktop Samsung, L=Sao Paulo, ST=SP, C=BR"
+
+      - name: Verificar
+        run: keytool -list -keystore desktop-samsung.jks -storepass "${{ inputs.store_pass }}"
+
+      - name: Upload da chave (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-samsung-signing-key
+          path: desktop-samsung.jks
