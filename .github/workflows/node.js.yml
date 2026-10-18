@@ -28,20 +28,173 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
-      - name: Compilar versao web
-        run: npm run build
-
+      # Plugins Capacitor (usados tambem pelo codigo web) ANTES do build web.
       - name: Instalar Capacitor
-        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+        run: npm install @capacitor/core@^7 @capacitor/cli@^7 @capacitor/android@^7
 
       - name: Preparar configuracao Android
         run: cp capacitor.config.example.json capacitor.config.json
 
-      - name: Adicionar plataformas Android
+      - name: Compilar versao web
+        run: npm run build
+
+      - name: Adicionar plataforma Android
         run: npx cap add android
 
       - name: Sincronizar Android
         run: npx cap sync android
+
+      # ===== Recursos nativos KingNative (reinjetados automaticamente a cada build) =====
+      # Bateria real, ajustes do sistema, abertura de arquivos por intent
+      # e instalacao de APKs pelo instalador oficial do Android.
+      - name: Injetar plugin nativo KingNative
+        run: |
+          mkdir -p android/app/src/main/java/com/exemplo/desktop android/app/src/main/res/xml
+          cat > android/app/src/main/java/com/exemplo/desktop/KingNativePlugin.java <<'EOF'
+          package com.exemplo.desktop;
+
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.IntentFilter;
+          import android.net.Uri;
+          import android.os.BatteryManager;
+          import android.os.Build;
+          import android.provider.Settings;
+          import androidx.core.content.FileProvider;
+          import com.getcapacitor.JSObject;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+          import java.io.File;
+
+          @CapacitorPlugin(name = "KingNative")
+          public class KingNativePlugin extends Plugin {
+
+              @PluginMethod
+              public void battery(PluginCall call) {
+                  Context ctx = getContext();
+                  BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+                  int level = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+                  Intent fi = ctx.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+                  int status = fi != null ? fi.getIntExtra(BatteryManager.EXTRA_STATUS, -1) : -1;
+                  boolean charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL;
+                  JSObject ret = new JSObject();
+                  ret.put("level", level);
+                  ret.put("charging", charging);
+                  call.resolve(ret);
+              }
+
+              @PluginMethod
+              public void openSettings(PluginCall call) {
+                  Context ctx = getContext();
+                  String target = call.getString("target", "general");
+                  Intent i;
+                  if ("wifi".equals(target)) {
+                      i = new Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY);
+                  } else if ("bluetooth".equals(target)) {
+                      i = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+                  } else if ("battery".equals(target)) {
+                      i = new Intent(Intent.ACTION_POWER_USAGE_SUMMARY);
+                  } else if ("apps".equals(target)) {
+                      i = new Intent(Settings.ACTION_APPLICATION_SETTINGS);
+                  } else if ("install".equals(target)) {
+                      i = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                      i.setData(Uri.parse("package:" + ctx.getPackageName()));
+                  } else {
+                      i = new Intent(Settings.ACTION_SETTINGS);
+                  }
+                  i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                  try {
+                      ctx.startActivity(i);
+                      call.resolve();
+                  } catch (Exception e) {
+                      call.reject("Nao foi possivel abrir as configuracoes: " + e.getMessage());
+                  }
+              }
+
+              private File fileFor(String path) {
+                  return new File(getContext().getExternalFilesDir(null), path);
+              }
+
+              @PluginMethod
+              public void openFile(PluginCall call) {
+                  String path = call.getString("path");
+                  String mime = call.getString("mimeType", "application/octet-stream");
+                  try {
+                      Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", fileFor(path));
+                      Intent i = new Intent(Intent.ACTION_VIEW);
+                      i.setDataAndType(uri, mime);
+                      i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                      getContext().startActivity(i);
+                      call.resolve();
+                  } catch (Exception e) {
+                      call.reject("Nao foi possivel abrir o arquivo: " + e.getMessage());
+                  }
+              }
+
+              @PluginMethod
+              public void installApk(PluginCall call) {
+                  String path = call.getString("path");
+                  Context ctx = getContext();
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ctx.getPackageManager().canRequestPackageInstalls()) {
+                      call.reject("AUTH_MISSING");
+                      return;
+                  }
+                  try {
+                      Uri uri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", fileFor(path));
+                      Intent i = new Intent(Intent.ACTION_VIEW);
+                      i.setDataAndType(uri, "application/vnd.android.package-archive");
+                      i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                      ctx.startActivity(i);
+                      call.resolve();
+                  } catch (Exception e) {
+                      call.reject("Nao foi possivel iniciar a instalacao: " + e.getMessage());
+                  }
+              }
+          }
+          EOF
+          cat > android/app/src/main/java/com/exemplo/desktop/MainActivity.java <<'EOF'
+          package com.exemplo.desktop;
+
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  registerPlugin(KingNativePlugin.class);
+              }
+          }
+          EOF
+          cat > android/app/src/main/res/xml/kingnative_file_paths.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths>
+              <external-files-path name="kingnative" path="." />
+              <files-path name="kingnative_internal" path="." />
+          </paths>
+          EOF
+          python3 - <<'PYEOF'
+          import pathlib
+          p = pathlib.Path('android/app/src/main/AndroidManifest.xml')
+          x = p.read_text()
+          if 'REQUEST_INSTALL_PACKAGES' not in x:
+              x = x.replace('</manifest>', '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n    <queries>\n        <intent>\n            <action android:name="android.intent.action.VIEW" />\n            <data android:mimeType="*/*" />\n        </intent>\n    </queries>\n</manifest>')
+          if 'kingnative_file_paths' not in x:
+              prov = ('        <provider\n'
+                      '            android:name="androidx.core.content.FileProvider"\n'
+                      '            android:authorities="\${applicationId}.fileprovider"\n'
+                      '            android:exported="false"\n'
+                      '            android:grantUriPermissions="true">\n'
+                      '            <meta-data\n'
+                      '                android:name="android.support.FILE_PROVIDER_PATHS"\n'
+                      '                android:resource="@xml/kingnative_file_paths" />\n'
+                      '        </provider>\n')
+              x = x.replace('    </application>', prov + '    </application>')
+          p.write_text(x)
+          print('Manifest patch OK')
+          PYEOF
 
       # Espelho do Maven Central para tentar contornar erros HTTP 403.
       - name: Corrigir acesso ao Maven Central (espelho)
@@ -90,10 +243,10 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > /tmp/desktop-samsung.jks
           test -s /tmp/desktop-samsung.jks
 
-      - name: Definir versao (versionCode 2 / versionName 1.1)
+      - name: Definir versao (versionCode 3 / versionName 1.2)
         run: |
-          sed -i 's/versionCode 1/versionCode 2/' android/app/build.gradle
-          sed -i 's/versionName "1.0"/versionName "1.1"/' android/app/build.gradle
+          sed -i 's/versionCode 1/versionCode 3/' android/app/build.gradle
+          sed -i 's/versionName "1.0"/versionName "1.2"/' android/app/build.gradle
           grep -nE 'versionCode|versionName' android/app/build.gradle
 
       - name: Gerar APK
@@ -111,12 +264,12 @@ jobs:
             --ks-key-alias "$KEY_ALIAS" \
             --ks-pass pass:"$KEYSTORE_PASSWORD" \
             --key-pass pass:"$KEY_PASSWORD" \
-            --out desktop-samsung-v1.1.apk \
+            --out desktop-samsung-v1.2.apk \
             android/app/build/outputs/apk/debug/app-debug.apk
-          $APKSIGNER verify --print-certs desktop-samsung-v1.1.apk
+          $APKSIGNER verify --print-certs desktop-samsung-v1.2.apk
 
       - name: Upload do APK
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-samsung-apk-v1.1
-          path: desktop-samsung-v1.1.apk
+          name: desktop-samsung-apk-v1.2
+          path: desktop-samsung-v1.2.apk
